@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import OpenAI from 'openai';
 import { OpenAIStream, StreamingTextResponse } from 'ai';
 import { NextResponse } from "next/server";
@@ -12,10 +12,10 @@ const openai = new OpenAI(configuration);
 
 export async function POST(req: Request) {
   try {
-    const { userId } = auth();
+    const user = await currentUser();
     const { messages } = await req.json();
 
-    if (!userId) {
+    if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 

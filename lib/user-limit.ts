@@ -1,16 +1,15 @@
-import { auth } from "@clerk/nextjs";
-
 import { MAX_FREE_COUNTS, DAY_IN_MS } from "@/constants";
 import prismadb from "@/lib/prismadb";
+import { currentUser } from "@clerk/nextjs/server";
 
 export const getUserLimit = async () => {
-  const { userId } = auth();
+  const user = await currentUser();
 
-  if (!userId) return null;
+  if (!user) return null;
 
   return await prismadb.userLimit.findUnique({
     where: {
-      userId
+      userId: user.id
     }
   });
 }
@@ -34,35 +33,35 @@ export const checkUserLimit = async () => {
 }
 
 export const incrementUserLimit = async () => {
-  const { userId } = auth();
+  const user = await currentUser();
 
-  if (!userId) return null;
+  if (!user) return null;
 
   const userLimit = await getUserLimit();
 
   if (userLimit) {
 
     return await prismadb.userLimit.update({
-      where: { userId },
+      where: { userId: user.id },
       data: { count: userLimit.count + 1 },
     });
   }
 
   return await prismadb.userLimit.create({
-    data: { userId, count: 1 },
+    data: { userId: user.id, count: 1 },
   });
 }
 
 export const checkSubscription = async () => {
-  const { userId } = auth();
+  const user = await currentUser();
 
-  if (!userId) {
+  if (!user) {
     return false;
   }
 
   const userSubscription = await prismadb.userSubscription.findUnique({
     where: {
-      userId,
+      userId: user.id,
     },
     select: {
       stripeCustomerId: true,

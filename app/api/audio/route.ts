@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import Replicate from 'replicate';
 import { NextResponse } from "next/server";
 import { checkSubscription, checkUserLimit, incrementUserLimit } from "@/lib/user-limit";
@@ -11,10 +11,10 @@ const replicate = new Replicate(configuration);
 
 export async function POST(req: Request) {
   try {
-    const { userId } = auth();
+    const user = await currentUser();
     const { prompt } = await req.json();
 
-    if (!userId) {
+    if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
