@@ -11,7 +11,7 @@ import CrispChat from '@/components/crisp-chat';
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Brainfast',
+  title: 'Cognito',
   description: 'Unlock the power of AI',
 }
 

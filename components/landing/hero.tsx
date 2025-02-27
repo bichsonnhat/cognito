@@ -25,7 +25,7 @@ const Hero = () => {
           <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
             <div className="hidden sm:mb-8 sm:flex sm:justify-center">
               <div className="rounded-full px-3 py-1 text-sm leading-6 text-gray-400 border">
-                Brainfast - Unleash the Power of AI
+              Cognito - Unleash the Power of AI
               </div>
             </div>
             <div className="text-center">
@@ -46,12 +46,12 @@ const Hero = () => {
               </p>
               <div className="mt-10 lg:flex items-center justify-center gap-x-6">
                 <Link href="/dashboard">
-                  <Button className=" text-white gradient-btn w-full lg:w-auto mb-8 lg:mb-0" size="lg">
-                    Try Brainfast Free
+                  <Button className="text-white gradient-btn w-full lg:w-auto mb-8 lg:mb-0 hover:scale-105 transition-all duration-300" size="lg">
+                    Try Cognito Free
                   </Button>
                 </Link>
                 <a href="#features" className="text-sm font-semibold leading-6 text-gray-400">
-                  Discover Brainfast AI <span aria-hidden="true">→</span>
+                  Discover Cognito AI <span aria-hidden="true">→</span>
                 </a>
               </div>
             </div>

@@ -41,7 +41,7 @@ export async function GET() {
           price_data: {
             currency: "USD",
             product_data: {
-              name: "Brainfast Pro",
+              name: "Cognito Pro",
               description: "Unlimited Generations"
             },
             unit_amount: 10000,

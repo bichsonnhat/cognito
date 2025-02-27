@@ -1,3 +1,4 @@
+"use server";
 import { MAX_FREE_COUNTS, DAY_IN_MS } from "@/constants";
 import prismadb from "@/lib/prismadb";
 import { currentUser } from "@clerk/nextjs/server";

@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="max-w-5xl mx-auto w-full flex flex-col lg:flex-row items-center justify-between">
         <Logo />
         <div className="text-sm mt-4 lg:mt-0">
-          © Copyright 2025, Brainfast
+          © Copyright 2025, Cognito
         </div>
       </div>
     </footer>
