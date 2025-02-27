@@ -40,20 +40,12 @@ export async function POST(req: Request) {
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      stream: true,
+      model: 'gpt-4o',
+      store: true,
       messages: [instructionMessage, ...messages],
     });
 
-    const stream = OpenAIStream(response, {
-      onCompletion: async () => {
-        if (!isPro) {
-          await incrementUserLimit();
-        }
-      },
-    });
-
-    return new StreamingTextResponse(stream);
+    return NextResponse.json(response.choices[0].message);
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       const { name, status, headers, message } = error;
