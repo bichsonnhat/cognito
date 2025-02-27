@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       messages,
     });
 
-    return response.choices[0].message;
+    return NextResponse.json(response.choices[0].message);
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       const { name, status, headers, message } = error;
