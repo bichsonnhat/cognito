@@ -23,7 +23,6 @@ import Loading from "@/components/loading";
 import { useToast } from "@/components/ui/use-toast";
 import ToolsNavigation from "@/components/dashboard/tools-navigation";
 import { useProStore } from "@/stores/pro-store";
-import DecryptedText from "@/components/DecryptedText/DecryptedText";
 
 const formSchema = z.object({
   prompt: z.string().min(1, {
@@ -39,18 +38,9 @@ interface MessageType {
 
 const VideoPage = () => {
   return (
-<DecryptedText
-text="Ahoy, matey!
-Set yer eyes on thisSet yer eyes on this
-And try tinkerin’ round’And try tinkerin’ round’
-with these here props, arr!with these here props, arr!"
-speed={100}
-maxIterations={20}
-characters="ABCD1234!?"
-className="revealed"
-parentClassName="all-letters"
-encryptedClassName="encrypted"
-/>
+    <div>
+      <h1>Video</h1>
+    </div>
   )
 }
 
