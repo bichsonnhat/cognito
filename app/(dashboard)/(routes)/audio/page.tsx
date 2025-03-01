@@ -1,175 +1,189 @@
 "use client";
 
-import { Send } from "lucide-react";
-import { useRef, useState } from "react";
-import axios from "axios";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { v4 as uuidv4 } from 'uuid';
-
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import UserMessage from "@/components/dashboard/user-message";
-import AiResponse from "@/components/dashboard/ai-response";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem
-} from "@/components/ui/form";
-import { cn } from "@/lib/utils";
-import Loading from "@/components/loading";
-import { useToast } from "@/components/ui/use-toast";
-import ToolsNavigation from "@/components/dashboard/tools-navigation";
-import { useProStore } from "@/stores/pro-store";
-
-const formSchema = z.object({
-  prompt: z.string().min(1, {
-    message: "Prompt is required"
-  }),
-});
-
-interface MessageType {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-}
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import ShinyText from "@/components/ShinyText/ShinyText";
+import GradientText from "@/components/GradientText/GradientText";
 
 const AudioPage = () => {
-  const { handleOpenOrCloseProModal } = useProStore();
-  const { toast } = useToast();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<MessageType[]>([]);
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      prompt: "",
-    }
-  });
+  const [text, setText] = useState("");
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordedAudio, setRecordedAudio] = useState<string | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
-  const isLoading = form.formState.isSubmitting;
-
-  const handleScrollToBottom = () => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const startRecording = async () => {
     try {
-      setMessages(current => ([...current, {
-        id: uuidv4(),
-        role: 'user',
-        content: values.prompt
-      },
-      {
-        id: uuidv4(),
-        role: 'assistant',
-        content: ""
-      }]));
-      handleScrollToBottom();
-      form.reset();
-
-      const { data } = await axios.post('/api/audio', values);
-
-      setMessages(current => {
-        const newMessages = [...current];
-        newMessages[newMessages.length - 1].content = data.audio;
-        return newMessages;
-      });
-      handleScrollToBottom();
-    } catch (error: any) {
-      if (error?.response?.status === 403) {
-        handleOpenOrCloseProModal();
-      } else {
-        setMessages([]);
-        toast({
-          variant: "destructive",
-          description: "Something went wrong. Please try again.",
-        });
+      // Clear previous recording when starting a new one
+      if (recordedAudio) {
+        URL.revokeObjectURL(recordedAudio);
+        setRecordedAudio(null);
       }
-    }
-  }
 
-  const handleClearChat = () => {
-    setMessages([]);
-  }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
+        const url = URL.createObjectURL(blob);
+        setRecordedAudio(url);
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      // Stop all tracks on the active stream
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('audio/')) {
+      // Clear previous recording if exists
+      if (recordedAudio) {
+        URL.revokeObjectURL(recordedAudio);
+        setRecordedAudio(null);
+      }
+      setAudioFile(file);
+      const url = URL.createObjectURL(file);
+      setRecordedAudio(url);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setIsLoading(true);
+      // TODO: Implement API call to generate audio from text
+      // For now, just simulating with a placeholder URL
+      setAudioUrl("https://example.com/audio.mp3");
+    } catch (error) {
+      console.error("Error generating audio:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="h-full relative flex flex-col justify-between">
-      <div
-        ref={containerRef}
-        className="h-[calc(100vh-180px)] overflow-y-auto space-y-10 scroll-smooth">
-        {messages.length > 0
-          ? <>
-            {
-              messages.map(m => (
-                <div key={m.id} className="whitespace-pre-wrap">
-                  {m.role === 'user' ?
-                    <UserMessage>{m.content}</UserMessage>
-                    :
-                    <AiResponse>
-                      {
-                        m.content ? <div className={cn(
-                          "block mb-4 space-y-4",
-                          "lg:flex lg:flex-wrap lg:items-center lg:space-x-4 lg:space-y-0"
-                        )}>
-                          <audio src={m.content} controls autoPlay />
-                        </div>
-                          :
-                          <Loading />
-                      }
-                    </AiResponse>
-                  }
-                </div>
-              ))
-            }
-            <div className="absolute left-0 bottom-20 text-right w-full pr-3">
-              <Button
-                size="sm"
-                onClick={handleClearChat}
-                variant="outline"
-              >
-                Clear chat
-              </Button>
-            </div>
-          </>
-          : <ToolsNavigation />}
-      </div>
-      <div className="mb-[13px]">
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex items-center w-full relative"
-          >
-            <FormField
-              name="prompt"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <Textarea
-                      placeholder="Guitar solo"
-                      className="min-h-1 resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
+    <div className="flex flex-col h-full p-4 space-y-4">
+      <GradientText
+        colors={["#40ffaa", "#4079ff", "#40ffaa", "#4079ff", "#40ffaa"]}
+        animationSpeed={3}
+        showBorder={false}
+        className="text-5xl font-sans"
+      >
+        Make your voice from text with AI
+      </GradientText>
+      
+      <Card className="p-4 space-y-8">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold">1</div>
+            <h2 className="text-lg font-semibold">Enter Text</h2>
+          </div>
+          <div className="space-y-2 pl-8">
+            <p className="text-sm text-muted-foreground">Type or paste the text you want to convert to speech</p>
+            <Input
+              placeholder="Type something to convert to speech..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
             />
-            <div className="absolute right-2 flex items-center space-x-4">
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="gradient-btn">
-                <Send />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold">2</div>
+            <h2 className="text-lg font-semibold">Add Audio (Optional)</h2>
+          </div>
+          <div className="space-y-4 pl-8">
+            <p className="text-sm text-muted-foreground">Choose to record your voice or upload an audio file</p>
+            <div className="flex gap-2">
+              <Button 
+                onClick={isRecording ? stopRecording : startRecording}
+                variant={isRecording ? "destructive" : "secondary"}
+                className="flex-1"
+              >
+                {isRecording ? "Stop Recording" : (recordedAudio ? "Record Again" : "Start Recording")}
               </Button>
+              <Button
+                onClick={() => audioInputRef.current?.click()}
+                variant="outline"
+                className="flex-1"
+              >
+                Upload Audio File
+              </Button>
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={handleAudioUpload}
+              />
             </div>
-          </form>
-        </Form>
-      </div>
+            {recordedAudio && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Your Audio</label>
+                <audio controls className="w-full mt-2">
+                  <source src={recordedAudio} type={audioFile?.type || "audio/ogg"} />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold">3</div>
+            <h2 className="text-lg font-semibold">Generate Audio</h2>
+          </div>
+          <div className="space-y-4 pl-8">
+            <p className="text-sm text-muted-foreground">Click the button below to convert your text to speech</p>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!text || isLoading}
+              className="w-full"
+            >
+              {isLoading ? "Generating..." : "Generate Audio"}
+            </Button>
+          </div>
+        </div>
+
+        {audioUrl && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center">4</div>
+              <h2 className="text-lg font-semibold">Listen to Generated Audio</h2>
+            </div>
+            <div className="space-y-2 pl-8">
+              <p className="text-sm text-muted-foreground">Your generated audio is ready to play</p>
+              <audio controls className="w-full">
+                <source src={audioUrl} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
-  )
-}
+  );
+};
 
 export default AudioPage;
