@@ -1,0 +1,3 @@
+[submodule "server/facefusion"]
+	path = server/facefusion
+	url = https://github.com/bichsonnhat/facefusion.git
