@@ -43,15 +43,29 @@ const VideoPage = () => {
   };
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith('audio/')) {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) {
+        console.error("No file selected");
+        return;
+      }
+      
+      if (!file.type.startsWith('audio/')) {
+        console.error("Invalid file type. Please upload an audio file.");
+        return;
+      }
+      
       // Clear previous recording if exists
       if (audioPreview) {
         URL.revokeObjectURL(audioPreview);
       }
+      
       setAudioFile(file);
       const url = URL.createObjectURL(file);
       setAudioPreview(url);
+      console.log("Audio file uploaded successfully:", file.name);
+    } catch (error) {
+      console.error("Error uploading audio file:", error);
     }
   };
 
@@ -104,9 +118,63 @@ const VideoPage = () => {
 
   const handleGenerateVideo = async () => {
     try {
+      if (!video) {
+        console.error("No video file selected");
+        return;
+      }
+
+      if (!audioFile) {
+        console.error("No audio file selected");
+        return;
+      }
+
+      const formVideoData = new FormData();
+      formVideoData.append("file", video);
+      const video_response = await fetch(`/api/cloudinary`, {
+        method: "POST",
+        body: formVideoData,
+      });
+
+      if (!video_response.ok) {
+        console.error("Failed to upload video");
+        return;
+      }
+
+      const video_data = await video_response.json();
+      console.log(video_data);
+
+      const formAudioData = new FormData();
+      formAudioData.append("file", audioFile);
+      const audio_response = await fetch(`/api/cloudinary`, {
+        method: "POST",
+        body: formAudioData,
+      });
+
+      if (!audio_response.ok) {
+        console.error("Failed to upload audio");
+        return;
+      }
+
+      const audio_data = await audio_response.json();
+      console.log(audio_data);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/generate-video`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ video: video_data.url, audio: audio_data.url }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFinalVideoPreview(data.video_path);
+      } else {
+        console.error("Failed to generate video");
+      }
+
       // Simulating video generation with a placeholder URL
       // Replace this with your actual video URL
-      setFinalVideoPreview("/path-to-final-video.mp4");
     } catch (error) {
       console.error("Error generating video:", error);
     }
@@ -193,46 +261,54 @@ const VideoPage = () => {
               <div className="space-y-2">
                 <p className="text-sm font-medium">Choose one of the following options:</p>
                 
-                <div className="flex gap-4 mb-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => audioInputRef.current?.click()}
-                    className="flex-1"
-                  >
-                    Upload Audio File
-                  </Button>
-                  <Button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    variant={isRecording ? "destructive" : "secondary"}
-                    className="flex-1"
-                  >
-                    {isRecording ? "Stop Recording" : (audioPreview ? "Record new voice" : "Start Recording")}
-                  </Button>
-                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-4 mb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => audioInputRef.current?.click()}
+                      className="flex-1"
+                    >
+                      Upload Audio File
+                    </Button>
+                    <Button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      variant={isRecording ? "destructive" : "secondary"}
+                      className="flex-1"
+                    >
+                      {isRecording ? "Stop Recording" : (audioPreview ? "Record new voice" : "Start Recording")}
+                    </Button>
+                  </div>
 
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={handleAudioUpload}
-                  ref={audioInputRef}
-                />
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Or write a script for AI voice:</p>
-                  <Textarea
-                    placeholder="Enter your script here..."
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    className="w-full h-32 resize-none"
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={handleAudioUpload}
+                    ref={audioInputRef}
                   />
+                  
+                  {audioFile && (
+                    <div className="text-sm text-green-600">
+                      Uploaded: {audioFile.name}
+                    </div>
+                  )}
+
+                  {audioPreview && (
+                    <div className="border rounded-lg p-4 space-y-2">
+                      <label className="text-sm font-medium">Audio Preview</label>
+                      <audio controls className="w-full">
+                        <source src={audioPreview} type={audioFile?.type || "audio/ogg"} />
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Step 3: Generate Audio */}
-          <div className="space-y-4">
+          {/* <div className="space-y-4">
             <div className="space-y-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">3</span>
@@ -252,24 +328,23 @@ const VideoPage = () => {
                 <ShinyText className="bg-black" text={isGenerating ? "Generating..." : "Generate Audio"} />
               </Button>
 
-              {audioPreview && (
+              {audioGenerated && (
                 <div className="border rounded-lg p-4 space-y-2">
-                  <label className="text-sm font-medium">Audio Preview</label>
+                  <label className="text-sm font-medium">Audio Generated</label>
                   <audio controls className="w-full">
-                    <source src={audioPreview} type={audioFile?.type || "audio/ogg"} />
+                    <source src={audioGenerated} type={audioFile?.type || "audio/ogg"} />
                     Your browser does not support the audio element.
                   </audio>
                 </div>
               )}
             </div>
-          </div>
+          </div> */}
 
           {/* Step 4: Final Video Generation */}
-          {video && audioPreview && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">4</span>
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">3</span>
                   Create Final Video
                 </h2>
                 <p className="text-gray-500 text-sm ml-10">
@@ -281,8 +356,9 @@ const VideoPage = () => {
                 onClick={handleGenerateVideo}
                 variant="default"
                 className="w-full h-10 text-base"
+                disabled={!video || !audioPreview}
               >
-                Generate Final Video
+                <ShinyText className="bg-black" text={isGenerating ? "Generating..." : "Generate Video"} />
               </Button>
 
               {finalVideoPreview && (
@@ -296,7 +372,6 @@ const VideoPage = () => {
                 </div>
               )}
             </div>
-          )}
         </div>
       </div>
     </div>

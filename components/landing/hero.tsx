@@ -29,7 +29,7 @@ const Hero = () => {
               </div>
             </div>
             <div className="text-center">
-              <h1 className="text-4xl leading-8 font-bold tracking-tight text-white sm:text-6xl">
+              <h1 className="text-4xl leading-8 font-bold tracking-tight dark:text-white text-gray-900 sm:text-6xl">
                 Ultimate AI
                 <span>
                   <Typewriter

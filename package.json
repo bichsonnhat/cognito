@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",
+    "@google/generative-ai": "^0.22.0",
     "@hookform/resolvers": "^3.3.1",
     "@prisma/client": "^5.2.0",
     "@radix-ui/react-alert-dialog": "^1.0.4",
@@ -32,6 +33,7 @@
     "autoprefixer": "10.4.15",
     "axios": "^1.5.0",
     "class-variance-authority": "^0.7.0",
+    "cloudinary": "^2.6.0",
     "clsx": "^2.0.0",
     "cmdk": "^0.2.0",
     "crisp-sdk-web": "^1.0.21",
@@ -40,6 +42,7 @@
     "framer-motion": "^11.3.24",
     "lucide-react": "^0.274.0",
     "next": "14.1.0",
+    "next-cloudinary": "^6.16.0",
     "next-themes": "^0.2.1",
     "openai": "^4.85.4",
     "postcss": "8.4.29",
