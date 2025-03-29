@@ -1,269 +1,313 @@
 "use client";
 
-import { Send } from "lucide-react";
 import { useRef, useState } from "react";
-import axios from "axios";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { v4 as uuidv4 } from 'uuid';
 import Image from "next/image";
+import axios from "axios";
+import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import UserMessage from "@/components/dashboard/user-message";
-import AiResponse from "@/components/dashboard/ai-response";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem
-} from "@/components/ui/form";
-import { cn } from "@/lib/utils";
+import GradientText from "@/components/GradientText/GradientText";
+import ShinyText from "@/components/ShinyText/ShinyText";
 import Loading from "@/components/loading";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PHOTO_AMOUNT_OPTIONS, PHOTO_RESOLUTION_OPTIONS } from "@/constants";
-import ToolsNavigation from "@/components/dashboard/tools-navigation";
 import { useProStore } from "@/stores/pro-store";
-
-const formSchema = z.object({
-  prompt: z.string().min(1, {
-    message: "Photo prompt is required"
-  }),
-  amount: z.string().min(1),
-  resolution: z.string().min(1),
-});
-
-interface MessageType {
-  id: string;
-  content: string | string[];
-  role: 'user' | 'assistant';
-}
 
 const PhotoPage = () => {
   const { handleOpenOrCloseProModal } = useProStore();
   const { toast } = useToast();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<MessageType[]>([]);
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      prompt: "",
-      amount: "1",
-      resolution: "512x512"
+  
+  const [sourceImage, setSourceImage] = useState<File | null>(null);
+  const [targetImage, setTargetImage] = useState<File | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<string>("");
+  const [targetPreview, setTargetPreview] = useState<string>("");
+  const [resultPreview, setResultPreview] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+  const targetInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSourceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSourceImage(file);
+      const url = URL.createObjectURL(file);
+      setSourcePreview(url);
     }
-  });
+  };
 
-  const isLoading = form.formState.isSubmitting;
-
-  const handleScrollToBottom = () => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+  const handleTargetImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setTargetImage(file);
+      const url = URL.createObjectURL(file);
+      setTargetPreview(url);
     }
-  }
+  };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    try {
-      setMessages(current => ([...current, {
-        id: uuidv4(),
-        role: 'user',
-        content: `${values.prompt} | ${values.amount} | ${values.resolution}`
-      },
-      {
-        id: uuidv4(),
-        role: 'assistant',
-        content: ""
-      }]));
-      handleScrollToBottom();
-      form.reset();
+  const handleSourceDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setSourceImage(file);
+      const url = URL.createObjectURL(file);
+      setSourcePreview(url);
+    }
+  };
 
-      const { data } = await axios.post('/api/photo', values);
+  const handleTargetDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setTargetImage(file);
+      const url = URL.createObjectURL(file);
+      setTargetPreview(url);
+    }
+  };
 
-      const urls = data.data.map((image: { url: string }) => image.url);
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
 
-      setMessages(current => {
-        const newMessages = [...current];
-        newMessages[newMessages.length - 1].content = urls;
-        return newMessages;
+  const handleGenerateFaceSwap = async () => {
+    if (!sourceImage || !targetImage) {
+      toast({
+        variant: "destructive",
+        description: "Please upload both source and target images."
       });
-      handleScrollToBottom();
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Upload source image
+      const sourceFormData = new FormData();
+      sourceFormData.append("file", sourceImage);
+      const sourceResponse = await fetch(`/api/cloudinary`, {
+        method: "POST",
+        body: sourceFormData,
+      });
+
+      if (!sourceResponse.ok) {
+        throw new Error("Failed to upload source image");
+      }
+
+      const sourceData = await sourceResponse.json();
+      console.log("sourceData", sourceData);
+
+      // Upload target image
+      const targetFormData = new FormData();
+      targetFormData.append("file", targetImage);
+      const targetResponse = await fetch(`/api/cloudinary`, {
+        method: "POST",
+        body: targetFormData,
+      });
+
+      if (!targetResponse.ok) {
+        throw new Error("Failed to upload target image");
+      }
+
+      const targetData = await targetResponse.json();
+      console.log("targetData", targetData);
+
+      // Generate face swap
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/faceswap`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sourceImage: sourceData.url, targetImage: targetData.url }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setResultPreview(data.image_path);
+      } else {
+        console.error("Failed to generate image");
+      }
+
     } catch (error: any) {
       if (error?.response?.status === 403) {
         handleOpenOrCloseProModal();
       } else {
-        setMessages([]);
         toast({
           variant: "destructive",
-          description: "Something went wrong. Please try again.",
+          description: "Failed to generate face swap. Please try again."
         });
+        console.error("Error generating face swap:", error);
       }
+    } finally {
+      setIsGenerating(false);
     }
-  }
-
-  const handleClearChat = () => {
-    setMessages([]);
-  }
+  };
 
   return (
-    <div className="h-full relative flex flex-col justify-between">
-      <div
-        ref={containerRef}
-        className="h-[calc(100vh-180px)] relative overflow-y-auto space-y-10 scroll-smooth">
-        {messages.length > 0
-          ? <>
-            {
-              messages.map(m => (
-                <div key={m.id} className="whitespace-pre-wrap">
-                  {m.role === 'user' ?
-                    <UserMessage>{m.content}</UserMessage>
-                    :
-                    <AiResponse>
-                      {
-                        m.content ? <div className={cn(
-                          "block mb-4 space-y-4",
-                          "lg:flex lg:flex-wrap lg:items-center lg:space-x-4 lg:space-y-0"
-                        )}>
-                          {
-                            typeof m.content === "object"
-                            && m.content?.map((url: string) =>
-                              <div key={url}>
-                                <Image
-                                  src={url}
-                                  width={200}
-                                  height={200}
-                                  className="rounded-lg"
-                                  alt={url} />
-                                <a href={url} target="_blank">
-                                  <Button
-                                    size="sm"
-                                    className="w-[200px] mt-2">
-                                    Download
-                                  </Button>
-                                </a>
-                              </div>
-                            )
-                          }
-                        </div>
-                          :
-                          <Loading />
-                      }
-                    </AiResponse>
-                  }
-                </div>
-              ))
-            }
-            <div className="absolute left-0 bottom-0 text-right w-full pr-3">
-              <Button
-                size="sm"
-                onClick={handleClearChat}
-                variant="outline"
-              >
-                Clear chat
-              </Button>
-            </div>
-          </>
-          : <ToolsNavigation />}
-      </div>
-      <div className="mb-[13px]">
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex items-center w-full relative"
+    <div className="h-full relative">
+      <div className="p-4 space-y-8 pb-20 overflow-y-auto h-[calc(100vh-180px)]">
+        <div className="flex items-center justify-between">
+          <GradientText
+            colors={["#ff40aa", "#4079ff", "#ff40aa", "#4079ff", "#ff40aa"]}
+            animationSpeed={3}
+            showBorder={false}
+            className="text-5xl font-sans"
           >
-            <FormField
-              name="prompt"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormControl>
-                    <Textarea
-                      placeholder="Cat kiss dog"
-                      className="min-h-1 resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <div className="absolute right-2 flex items-center space-x-4">
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      disabled={isLoading}
-                      defaultValue={field.value}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue defaultValue={field.value} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {PHOTO_AMOUNT_OPTIONS.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            value={option.value}
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="resolution"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      value={field.value}
-                      defaultValue={field.value}
-                      disabled={isLoading}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue defaultValue={field.value} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {PHOTO_RESOLUTION_OPTIONS.map((option) => (
-                          <SelectItem
-                            key={option.value}
-                            value={option.value}
-                          >
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="gradient-btn">
-                <Send />
-              </Button>
+            AI Face Swap
+          </GradientText>
+        </div>
+
+        <div className="flex flex-col space-y-8 max-w-4xl mx-auto">
+          {/* Step 1: Source Image Upload */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">1</span>
+                Upload Source Face
+              </h2>
+              <p className="text-gray-500 text-sm ml-10">
+                Upload an image with the face you want to use as the source.
+                We support JPG, PNG, and WebP formats.
+              </p>
             </div>
-          </form>
-        </Form>
+
+            <div 
+              className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-50 transition cursor-pointer"
+              onClick={() => sourceInputRef.current?.click()}
+              onDrop={handleSourceDrop}
+              onDragOver={handleDragOver}
+            >
+              <input 
+                type="file" 
+                accept="image/*"
+                className="hidden"
+                onChange={handleSourceImageUpload}
+                ref={sourceInputRef}
+              />
+              
+              <div className="space-y-4">
+                <div className="text-gray-500">
+                  Drag and drop your source image here, or click to select
+                </div>
+                <div className="text-sm text-gray-400">
+                  Supported formats: JPG, PNG, WebP
+                </div>
+              </div>
+            </div>
+
+            {sourcePreview && (
+              <div className="border rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-2">Source Image Preview</h3>
+                <div className="relative w-full h-[300px]">
+                  <Image 
+                    src={sourcePreview}
+                    fill
+                    className="object-contain rounded-lg"
+                    alt="Source face"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Step 2: Target Image Upload */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">2</span>
+                Upload Target Image
+              </h2>
+              <p className="text-gray-500 text-sm ml-10">
+                Upload the image where you want to place the source face.
+              </p>
+            </div>
+
+            <div 
+              className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-gray-50 transition cursor-pointer"
+              onClick={() => targetInputRef.current?.click()}
+              onDrop={handleTargetDrop}
+              onDragOver={handleDragOver}
+            >
+              <input 
+                type="file" 
+                accept="image/*"
+                className="hidden"
+                onChange={handleTargetImageUpload}
+                ref={targetInputRef}
+              />
+              
+              <div className="space-y-4">
+                <div className="text-gray-500">
+                  Drag and drop your target image here, or click to select
+                </div>
+                <div className="text-sm text-gray-400">
+                  Supported formats: JPG, PNG, WebP
+                </div>
+              </div>
+            </div>
+
+            {targetPreview && (
+              <div className="border rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-2">Target Image Preview</h3>
+                <div className="relative w-full h-[300px]">
+                  <Image 
+                    src={targetPreview}
+                    fill
+                    className="object-contain rounded-lg"
+                    alt="Target image"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Step 3: Generate Face Swap */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">3</span>
+                Generate Face Swap
+              </h2>
+              <p className="text-gray-500 text-sm ml-10">
+                Click the button below to swap the face from the source image onto the target image.
+              </p>
+            </div>
+
+            <Button
+              onClick={handleGenerateFaceSwap}
+              variant="default"
+              className="w-full h-10 text-base"
+              disabled={!sourceImage || !targetImage || isGenerating}
+            >
+              <ShinyText className="bg-black" text={isGenerating ? "Generating..." : "Swap Faces"} />
+            </Button>
+
+            {isGenerating && (
+              <div className="flex justify-center py-8">
+                <Loading />
+              </div>
+            )}
+
+            {resultPreview && (
+              <div className="border rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-2">Face Swap Result</h3>
+                <div className="relative w-full h-[300px]">
+                  <Image 
+                    src={resultPreview}
+                    fill
+                    className="object-contain rounded-lg"
+                    alt="Face swap result"
+                  />
+                </div>
+                <a href={resultPreview} target="_blank" rel="noopener noreferrer">
+                  <Button className="w-full mt-4">
+                    Download Result
+                  </Button>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default PhotoPage;
