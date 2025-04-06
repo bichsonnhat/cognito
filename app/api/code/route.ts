@@ -1,6 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
 import OpenAI from 'openai';
-import { OpenAIStream, StreamingTextResponse } from 'ai';
 import { NextResponse } from "next/server";
 import { checkSubscription, checkUserLimit, incrementUserLimit } from "@/lib/user-limit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -59,22 +58,46 @@ export async function POST(req: Request) {
       history: [],
     });
     
-    // convert messages to string
-    const messagesString = messages.map((message: any) => `${message.role}: ${message.content}`).join("\n");
+    // Add system instruction to prompt Gemini to respond in markdown
+    const enhancedMessages = [
+      { role: "system", content: "You are a code generator. You must answer only in markdown code snippets. Use code comments for explanations." },
+      ...messages
+    ];
+    
+    // Convert messages to string
+    const messagesString = enhancedMessages.map((message: any) => `${message.role}: ${message.content}`).join("\n");
+    
+    // Get response from Gemini
     const result = await chatSession.sendMessage(messagesString);
-    // const response = await openai.chat.completions.create({
-    //   model: 'gpt-4o',
-    //   store: true,
-    //   messages,
-    // });
+    const responseText = result.response.text();
+    
+    // Format the response as proper markdown code blocks
+    let formattedResponse = responseText.trim();
+    
+    // If it starts with a language identifier but not with markdown code blocks
+    if (formattedResponse.match(/^[a-z]+\n/) && !formattedResponse.startsWith("```")) {
+      const parts = formattedResponse.split('\n');
+      const language = parts[0];
+      const content = parts.slice(1).join('\n');
+      formattedResponse = `\`\`\`${language}${content}\n\`\`\``;
+    } 
+    // If it doesn't have code blocks at all
+    else if (!formattedResponse.startsWith("```")) {
+      formattedResponse = `\`\`\`\n${formattedResponse}\n\`\`\``;
+    }
+    
+    // Track usage if not a pro user
+    if (!isPro) {
+      await incrementUserLimit();
+    }
 
-    return NextResponse.json(result.response.text());
+    return NextResponse.json(formattedResponse);
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       const { name, status, headers, message } = error;
       return NextResponse.json({ name, status, headers, message }, { status });
     } else {
-      throw error;
+      return NextResponse.json({ message: "An error occurred", error: String(error) }, { status: 500 });
     }
   }
 }

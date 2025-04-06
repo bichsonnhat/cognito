@@ -64,6 +64,9 @@ export async function POST(req: Request) {
     //   store: true,
     //   messages,
     // });
+    if (!isPro) {
+      await incrementUserLimit();
+    }
 
     return NextResponse.json(result.response.text());
   } catch (error) {
