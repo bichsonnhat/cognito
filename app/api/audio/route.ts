@@ -12,9 +12,9 @@ const replicate = new Replicate(configuration);
 export async function POST(req: Request) {
   try {
     const user = await currentUser();
-    const { prompt } = await req.json();
 
     if (!user) {
+      console.log("Unauthorized neeee");
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -22,9 +22,7 @@ export async function POST(req: Request) {
       return new NextResponse("Miss Replicate API Key.", { status: 500 });
     }
 
-    if (!prompt) {
-      return new NextResponse("Prompt are required", { status: 400 });
-    }
+    const { text, audioFile } = await req.json();
 
     const reachToLimit = await checkUserLimit();
     const isPro = await checkSubscription();
@@ -33,20 +31,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "You are reach to limit. Please upgrade to higher plan.", status: 403 }, { status: 403 });
     }
 
-    const response = await replicate.run(
-      "riffusion/riffusion:8cf61ea6c56afd61d8f5b9ffd14d7c216c0a93844ce2d82ac1c9ecc9c7f24e05",
-      {
-        input: {
-          prompt_a: prompt,
-        }
-      }
-    );
+    
+    let audioUrl = "https://replicate.delivery/pbxt/KibHoI1aA7kYweYgeSV2fFOY67QwEuZNe5l1tFX7Z6FkaEoi/samples_nu-luu-loat.wav";
+
+    if (audioFile) {
+      audioUrl = audioFile;
+    }   
+
+    const input = {
+      text: text,
+      speaker: audioUrl
+    };
+
+    const output = await replicate.run("suminhthanh/vixtts:5222190b47dfb128cd588f07dadb78107aa489bdcd0af45814d7841d47f608c6", { input });
 
     if (!isPro) {
       await incrementUserLimit();
     }
-
-    return NextResponse.json(response);
+    return NextResponse.json(output);
   } catch (error) {
     return new NextResponse("Something went wrong.", { status: 500 });
   }

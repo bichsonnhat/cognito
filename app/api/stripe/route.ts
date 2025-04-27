@@ -21,6 +21,18 @@ export async function GET() {
 
     const dashboardUrl = absoluteUrl("/dashboard");
     if (userSubscription?.stripeCustomerId) {
+      const configuration = await stripe.billingPortal.configurations.create({
+        business_profile: {
+          headline: "Cognito Pro Subscription",
+          privacy_policy_url: dashboardUrl,
+          terms_of_service_url: dashboardUrl,
+        },
+        features: {
+          invoice_history: {
+            enabled: true,
+          },
+        },
+      });
       const stripeSession = await stripe.billingPortal.sessions.create({
         customer: userSubscription.stripeCustomerId,
         return_url: dashboardUrl,

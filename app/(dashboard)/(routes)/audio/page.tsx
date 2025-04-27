@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import ShinyText from "@/components/ShinyText/ShinyText";
 import GradientText from "@/components/GradientText/GradientText";
+import { Loader2 } from "lucide-react";
 
 const AudioPage = () => {
   const [text, setText] = useState("");
@@ -70,9 +71,29 @@ const AudioPage = () => {
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
-      // TODO: Implement API call to generate audio from text
-      // For now, just simulating with a placeholder URL
-      setAudioUrl("https://example.com/audio.mp3");
+      let audioUrl = null;
+      if (audioFile) {
+        const formAudioData = new FormData();
+        formAudioData.append("file", audioFile);
+        const audio_response = await fetch(`/api/cloudinary`, {
+          method: "POST",
+          body: formAudioData,
+        });
+  
+        if (!audio_response.ok) {
+          console.error("Failed to upload audio");
+          return;
+        }
+  
+        const audio_data = await audio_response.json();
+        audioUrl = audio_data.url;
+      }
+      const response = await fetch("/api/audio", {
+        method: "POST",
+        body: JSON.stringify({ text, audioUrl }),
+      });
+      const data = await response.json();
+      setAudioUrl(data.path);
     } catch (error) {
       console.error("Error generating audio:", error);
     } finally {
@@ -161,7 +182,12 @@ const AudioPage = () => {
               disabled={!text || isLoading}
               className="w-full"
             >
-              {isLoading ? "Generating..." : "Generate Audio"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : "Generate Audio"}
             </Button>
           </div>
         </div>
