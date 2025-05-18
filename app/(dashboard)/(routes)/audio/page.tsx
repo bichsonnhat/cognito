@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -12,59 +12,47 @@ const AudioPage = () => {
   const [text, setText] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedAudio, setRecordedAudio] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioKey, setAudioKey] = useState(Date.now()); // Add a key to force re-render
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  const startRecording = async () => {
-    try {
-      // Clear previous recording when starting a new one
+  // Cleanup function for audio URLs
+  useEffect(() => {
+    return () => {
       if (recordedAudio) {
         URL.revokeObjectURL(recordedAudio);
-        setRecordedAudio(null);
       }
+    };
+  }, []);
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
-
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
-        const url = URL.createObjectURL(blob);
-        setRecordedAudio(url);
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-    } catch (error) {
-      console.error("Error accessing microphone:", error);
+  const resetAudio = () => {
+    if (recordedAudio) {
+      URL.revokeObjectURL(recordedAudio);
     }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      // Stop all tracks on the active stream
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
+    setRecordedAudio(null);
+    setAudioFile(null);
+    setAudioKey(Date.now());
   };
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('audio/')) {
-      // Clear previous recording if exists
-      if (recordedAudio) {
-        URL.revokeObjectURL(recordedAudio);
-        setRecordedAudio(null);
-      }
-      setAudioFile(file);
+      // Reset everything
+      resetAudio();
+      
+      // Create new URL for the new file
       const url = URL.createObjectURL(file);
+      
+      // Update state with new file and URL
+      setAudioFile(file);
       setRecordedAudio(url);
+      setAudioKey(Date.now()); // Update key to force re-render
+      
+      // Reset input to ensure we can select the same file again
+      if (audioInputRef.current) {
+        audioInputRef.current.value = '';
+      }
     }
   };
 
@@ -88,12 +76,15 @@ const AudioPage = () => {
         const audio_data = await audio_response.json();
         audioUrl = audio_data.url;
       }
-      const response = await fetch("/api/audio", {
+      const response = await fetch(`/api/audio`, {
         method: "POST",
-        body: JSON.stringify({ text, audioUrl }),
+        body: JSON.stringify({ text, audioFile: audioUrl }),
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
       const data = await response.json();
-      setAudioUrl(data.path);
+      setAudioUrl(data.audio_url);
     } catch (error) {
       console.error("Error generating audio:", error);
     } finally {
@@ -134,19 +125,12 @@ const AudioPage = () => {
             <h2 className="text-lg font-semibold">Add Audio (Optional)</h2>
           </div>
           <div className="space-y-4 pl-8">
-            <p className="text-sm text-muted-foreground">Choose to record your voice or upload an audio file</p>
+            <p className="text-sm text-muted-foreground">Upload an audio file to use as a voice reference</p>
             <div className="flex gap-2">
-              <Button 
-                onClick={isRecording ? stopRecording : startRecording}
-                variant={isRecording ? "destructive" : "secondary"}
-                className="flex-1"
-              >
-                {isRecording ? "Stop Recording" : (recordedAudio ? "Record Again" : "Start Recording")}
-              </Button>
               <Button
                 onClick={() => audioInputRef.current?.click()}
                 variant="outline"
-                className="flex-1"
+                className="w-full"
               >
                 Upload Audio File
               </Button>
@@ -161,7 +145,7 @@ const AudioPage = () => {
             {recordedAudio && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Your Audio</label>
-                <audio controls className="w-full mt-2">
+                <audio key={audioKey} controls className="w-full mt-2">
                   <source src={recordedAudio} type={audioFile?.type || "audio/ogg"} />
                   Your browser does not support the audio element.
                 </audio>
