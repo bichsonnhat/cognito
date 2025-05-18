@@ -9,6 +9,7 @@ import cloudinary.uploader
 from cloudinary.utils import cloudinary_url
 from dotenv import load_dotenv
 import os
+import replicate
 app = Flask(__name__)
 
 load_dotenv()
@@ -178,6 +179,30 @@ def download_image(image_url):
         
     return os.path.abspath(f"download/{image_filename}")
     
+@app.route("/generate-audio", methods=["POST"])
+def generate_audio():
+    text = request.json["text"]
+    voice = request.json["voice"]
+    REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+    print(text, voice)
+    input = {
+        "text": text,
+        "speaker": voice
+    }
+    output = replicate.run(
+        "suminhthanh/vixtts:5222190b47dfb128cd588f07dadb78107aa489bdcd0af45814d7841d47f608c6",
+        input=input,
+        api_token=REPLICATE_API_TOKEN
+    )
+    
+    print(output)
+    # Extract the URL from the FileOutput object
+    if isinstance(output, dict) and 'path' in output:
+        audio_url = str(output['path'])
+    else:
+        audio_url = str(output)
+    
+    return jsonify({"audio_url": audio_url})
 
 if __name__ == "__main__":
     app.run(debug=True)

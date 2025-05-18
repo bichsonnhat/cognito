@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import GradientText from "@/components/GradientText/GradientText";
 import ShinyText from "@/components/ShinyText/ShinyText";
+import { Loader2 } from "lucide-react";
 const VideoPage = () => {
   const [video, setVideo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
@@ -128,6 +129,8 @@ const VideoPage = () => {
         return;
       }
 
+      setIsGenerating(true);
+
       const formVideoData = new FormData();
       formVideoData.append("file", video);
       const video_response = await fetch(`/api/cloudinary`, {
@@ -177,6 +180,8 @@ const VideoPage = () => {
       // Replace this with your actual video URL
     } catch (error) {
       console.error("Error generating video:", error);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -356,9 +361,16 @@ const VideoPage = () => {
                 onClick={handleGenerateVideo}
                 variant="default"
                 className="w-full h-10 text-base"
-                disabled={!video || !audioPreview}
+                disabled={!video || !audioPreview || isGenerating}
               >
-                <ShinyText className="bg-black" text={isGenerating ? "Generating..." : "Generate Video"} />
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  "Generate Video"
+                )}
               </Button>
 
               {finalVideoPreview && (
