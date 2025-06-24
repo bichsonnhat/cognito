@@ -26,3 +26,15 @@ model UserSubscription {
   stripePriceId           String?   @map(name: "stripe_price_id")
   stripeCurrentPeriodEnd  DateTime? @map(name: "stripe_current_period_end")
 }
+
+model ChatHistory {
+  id                      String    @id @default(cuid())
+  userId                  String
+  chatType                String    // "conversation" or "code"
+  messages                Json      // Store messages as JSON array
+  title                   String?   // Optional title for the chat
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId, chatType])
+}

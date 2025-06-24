@@ -1,8 +1,8 @@
 "use client";
 
 import { useChat } from "ai/react";
-import { Send } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Send, History } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import UserMessage from "@/components/dashboard/user-message";
@@ -11,10 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import MarkdownResponse from "@/components/dashboard/markdown-response";
 import ToolsNavigation from "@/components/dashboard/tools-navigation";
 import { useProStore } from "@/stores/pro-store";
+import ChatHistory from "@/components/dashboard/chat-history";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const ConversationPage = () => {
   const { handleOpenOrCloseProModal } = useProStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  
   const {
     messages,
     input,
@@ -25,7 +30,10 @@ const ConversationPage = () => {
     error,
     setMessages
   } = useChat({
-    api: "/api/conversation"
+    api: "/api/conversation",
+    body: {
+      chatId: currentChatId
+    }
   });
 
   useEffect(() => {
@@ -45,10 +53,48 @@ const ConversationPage = () => {
 
   const handleClearChat = () => {
     setMessages([]);
+    setCurrentChatId(null);
   }
+
+  const handleSelectChat = (chatId: string, chatMessages: any[]) => {
+    setCurrentChatId(chatId);
+    setMessages(chatMessages);
+    setShowHistory(false);
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    if (currentChatId === chatId) {
+      setMessages([]);
+      setCurrentChatId(null);
+    }
+  };
 
   return (
     <div className="h-full relative flex flex-col justify-between">
+      <div className="absolute top-2 right-2 z-10">
+        <Sheet open={showHistory} onOpenChange={setShowHistory}>
+          <SheetTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => setShowHistory(true)}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+            <div className="py-6">
+              <h3 className="text-lg font-medium mb-4">Chat History</h3>
+              <ChatHistory 
+                chatType="conversation" 
+                onSelectChat={handleSelectChat}
+                onDeleteChat={handleDeleteChat}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
       <div
         ref={containerRef}
         className="h-[calc(100vh-180px)] overflow-y-auto space-y-10 scroll-smooth">

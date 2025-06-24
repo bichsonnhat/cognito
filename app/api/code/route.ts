@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { NextResponse } from "next/server";
 import { checkSubscription, checkUserLimit, incrementUserLimit } from "@/lib/user-limit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { saveChatHistory } from "@/lib/chat-history";
 
 const apiKey = process.env.GEMINI_API_KEY as string;
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -32,7 +33,7 @@ const instructionMessage = {
 export async function POST(req: Request) {
   try {
     const user = await currentUser();
-    const { messages } = await req.json();
+    const { messages, chatId } = await req.json();
 
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -84,6 +85,23 @@ export async function POST(req: Request) {
     // If it doesn't have code blocks at all
     else if (!formattedResponse.startsWith("```")) {
       formattedResponse = `\`\`\`\n${formattedResponse}\n\`\`\``;
+    }
+    
+    // Save the chat history with the new assistant response
+    const updatedMessages = [
+      ...messages,
+      {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: formattedResponse
+      }
+    ];
+
+    try {
+      await saveChatHistory(updatedMessages, "code");
+    } catch (error) {
+      console.error("Failed to save chat history:", error);
+      // Continue with the response even if saving fails
     }
     
     // Track usage if not a pro user
