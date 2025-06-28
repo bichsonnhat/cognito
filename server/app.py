@@ -189,20 +189,50 @@ def generate_audio():
         "text": text,
         "speaker": voice
     }
-    output = replicate.run(
-        "suminhthanh/vixtts:5222190b47dfb128cd588f07dadb78107aa489bdcd0af45814d7841d47f608c6",
+    
+    # Create a prediction instead of running synchronously
+    prediction = replicate.predictions.create(
+        version="suminhthanh/vixtts:5222190b47dfb128cd588f07dadb78107aa489bdcd0af45814d7841d47f608c6",
         input=input,
         api_token=REPLICATE_API_TOKEN
     )
     
-    print(output)
-    # Extract the URL from the FileOutput object
-    if isinstance(output, dict) and 'path' in output:
-        audio_url = str(output['path'])
-    else:
-        audio_url = str(output)
+    # Return the prediction ID
+    return jsonify({"prediction_id": prediction.id})
+
+@app.route("/prediction-status", methods=["GET"])
+def prediction_status():
+    prediction_id = request.args.get("id")
+    if not prediction_id:
+        return jsonify({"error": "Missing prediction ID"}), 400
     
-    return jsonify({"audio_url": audio_url})
+    REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+    
+    # Get the prediction status
+    prediction = replicate.predictions.get(prediction_id, api_token=REPLICATE_API_TOKEN)
+    
+    # Check the status
+    if prediction.status == "succeeded":
+        # Extract the URL from the output
+        if isinstance(prediction.output, dict) and 'path' in prediction.output:
+            audio_url = str(prediction.output['path'])
+        else:
+            audio_url = str(prediction.output)
+        
+        return jsonify({
+            "status": "succeeded",
+            "audio_url": audio_url
+        })
+    elif prediction.status == "failed":
+        return jsonify({
+            "status": "failed",
+            "error": prediction.error
+        })
+    else:
+        # Still processing
+        return jsonify({
+            "status": prediction.status
+        })
 
 if __name__ == "__main__":
     app.run(debug=True)

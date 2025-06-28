@@ -15,6 +15,9 @@ const AudioPage = () => {
   const [recordedAudio, setRecordedAudio] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioKey, setAudioKey] = useState(Date.now()); // Add a key to force re-render
+  const [predictionId, setPredictionId] = useState<string | null>(null);
+  const [predictionStatus, setPredictionStatus] = useState<string | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup function for audio URLs
@@ -23,8 +26,63 @@ const AudioPage = () => {
       if (recordedAudio) {
         URL.revokeObjectURL(recordedAudio);
       }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
   }, []);
+
+  // Effect for polling prediction status
+  useEffect(() => {
+    if (predictionId && !audioUrl) {
+      // Start polling
+      pollingIntervalRef.current = setInterval(checkPredictionStatus, 5000);
+      
+      // Initial check
+      checkPredictionStatus();
+      
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+        }
+      };
+    }
+  }, [predictionId]);
+
+  const checkPredictionStatus = async () => {
+    if (!predictionId) return;
+    
+    try {
+      const response = await fetch(`/api/audio/prediction-status?id=${predictionId}`);
+      const data = await response.json();
+      
+      setPredictionStatus(data.status);
+      
+      if (data.status === "succeeded" && data.audio_url) {
+        setAudioUrl(data.audio_url);
+        setPredictionId(null);
+        setIsLoading(false);
+        
+        // Clear the polling interval
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      } else if (data.status === "failed") {
+        console.error("Prediction failed:", data.error);
+        setIsLoading(false);
+        setPredictionId(null);
+        
+        // Clear the polling interval
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+    } catch (error) {
+      console.error("Error checking prediction status:", error);
+    }
+  };
 
   const resetAudio = () => {
     if (recordedAudio) {
@@ -59,6 +117,10 @@ const AudioPage = () => {
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
+      setAudioUrl(null);
+      setPredictionId(null);
+      setPredictionStatus(null);
+      
       let audioUrl = null;
       if (audioFile) {
         const formAudioData = new FormData();
@@ -76,28 +138,28 @@ const AudioPage = () => {
         const audio_data = await audio_response.json();
         audioUrl = audio_data.url;
       }
-      
-      // Create AbortController with a 10-minute timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
-      
       const response = await fetch(`/api/audio`, {
         method: "POST",
         body: JSON.stringify({ text, audioFile: audioUrl }),
         headers: {
           "Content-Type": "application/json",
         },
-        signal: controller.signal
       });
-      
-      // Clear the timeout
-      clearTimeout(timeoutId);
-      
       const data = await response.json();
-      setAudioUrl(data.audio_url);
+      
+      if (data.prediction_id) {
+        setPredictionId(data.prediction_id);
+        setPredictionStatus("processing");
+      } else if (data.audio_url) {
+        // For backward compatibility
+        setAudioUrl(data.audio_url);
+        setIsLoading(false);
+      } else {
+        console.error("Unexpected response format:", data);
+        setIsLoading(false);
+      }
     } catch (error) {
       console.error("Error generating audio:", error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -179,10 +241,15 @@ const AudioPage = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
+                  {predictionStatus === "processing" ? "Processing..." : "Generating..."}
                 </>
               ) : "Generate Audio"}
             </Button>
+            {predictionStatus && !audioUrl && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Status: {predictionStatus === "processing" ? "Processing your audio..." : predictionStatus}
+              </p>
+            )}
           </div>
         </div>
 
