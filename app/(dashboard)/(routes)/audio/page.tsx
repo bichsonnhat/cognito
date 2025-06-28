@@ -76,13 +76,23 @@ const AudioPage = () => {
         const audio_data = await audio_response.json();
         audioUrl = audio_data.url;
       }
+      
+      // Create AbortController with a 10-minute timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
+      
       const response = await fetch(`/api/audio`, {
         method: "POST",
         body: JSON.stringify({ text, audioFile: audioUrl }),
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal
       });
+      
+      // Clear the timeout
+      clearTimeout(timeoutId);
+      
       const data = await response.json();
       setAudioUrl(data.audio_url);
     } catch (error) {
