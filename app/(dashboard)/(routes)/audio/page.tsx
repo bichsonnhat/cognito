@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import ShinyText from "@/components/ShinyText/ShinyText";
 import GradientText from "@/components/GradientText/GradientText";
 import { Loader2 } from "lucide-react";
+import { saveGeneratedContent } from "@/lib/generated-content";
 
 const AudioPage = () => {
   const [text, setText] = useState("");
@@ -62,6 +63,18 @@ const AudioPage = () => {
         setAudioUrl(data.audio_url);
         setPredictionId(null);
         setIsLoading(false);
+        
+        // Save to database
+        try {
+          await saveGeneratedContent({
+            contentType: "audio",
+            contentUrl: data.audio_url,
+            prompt: text,
+            title: `Audio - ${new Date().toLocaleDateString()}`,
+          });
+        } catch (error) {
+          console.error("Failed to save generated content:", error);
+        }
         
         // Clear the polling interval
         if (pollingIntervalRef.current) {

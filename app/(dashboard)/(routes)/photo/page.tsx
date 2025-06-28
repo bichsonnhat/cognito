@@ -11,6 +11,7 @@ import ShinyText from "@/components/ShinyText/ShinyText";
 import Loading from "@/components/loading";
 import { useToast } from "@/components/ui/use-toast";
 import { useProStore } from "@/stores/pro-store";
+import { saveGeneratedContent } from "@/lib/generated-content";
 
 const PhotoPage = () => {
   const { handleOpenOrCloseProModal } = useProStore();
@@ -121,6 +122,18 @@ const PhotoPage = () => {
       if (response.ok) {
         const data = await response.json();
         setResultPreview(data.image_path);
+        
+        // Save to database
+        try {
+          await saveGeneratedContent({
+            contentType: "photo",
+            contentUrl: data.image_path,
+            title: `Face Swap - ${new Date().toLocaleDateString()}`,
+            prompt: "Face swap generation",
+          });
+        } catch (error) {
+          console.error("Failed to save generated content:", error);
+        }
       } else {
         console.error("Failed to generate image");
       }

@@ -46,6 +46,12 @@ export const NAVIGATIONS = [
     slug: "dashboard"
   },
   ...TOOLS,
+  {
+    title: "Gallery",
+    icon: "/icons/photo.svg",
+    url: "/gallery",
+    slug: "gallery"
+  },
 ];
 
 export const THEME_MODES = [

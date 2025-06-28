@@ -38,3 +38,18 @@ model ChatHistory {
 
   @@index([userId, chatType])
 }
+
+model GeneratedContent {
+  id                      String    @id @default(cuid())
+  userId                  String
+  contentType             String    // "audio", "photo", "video"
+  contentUrl              String    // URL of the generated content
+  title                   String?   // Optional title
+  prompt                  String?   // The input text/prompt used
+  metadata                Json?     // Additional metadata (e.g., settings, params)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId, contentType])
+  @@index([userId, createdAt])
+}

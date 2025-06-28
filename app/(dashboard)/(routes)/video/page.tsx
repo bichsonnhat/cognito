@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import GradientText from "@/components/GradientText/GradientText";
 import ShinyText from "@/components/ShinyText/ShinyText";
 import { Loader2 } from "lucide-react";
+import { saveGeneratedContent } from "@/lib/generated-content";
 const VideoPage = () => {
   const [video, setVideo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
@@ -172,6 +173,18 @@ const VideoPage = () => {
       if (response.ok) {
         const data = await response.json();
         setFinalVideoPreview(data.video_path);
+        
+        // Save to database
+        try {
+          await saveGeneratedContent({
+            contentType: "video",
+            contentUrl: data.video_path,
+            title: `Lip Sync Video - ${new Date().toLocaleDateString()}`,
+            prompt: "Lip sync video generation",
+          });
+        } catch (error) {
+          console.error("Failed to save generated content:", error);
+        }
       } else {
         console.error("Failed to generate video");
       }

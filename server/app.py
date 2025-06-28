@@ -209,7 +209,7 @@ def prediction_status():
     REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
     
     # Get the prediction status
-    prediction = replicate.predictions.get(prediction_id, api_token=REPLICATE_API_TOKEN)
+    prediction = replicate.predictions.get(prediction_id)
     
     # Check the status
     if prediction.status == "succeeded":
